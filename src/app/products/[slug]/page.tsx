@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, useRouter } from 'next/navigation';
 import { AppDispatch, RootState } from '@/lib/store';
-import { fetchProductBySlug, deleteProduct } from '@/lib/features/products/productsSlice'; // Removed clearSelectedProduct
+import { fetchProductBySlug, clearSelectedProduct, deleteProduct } from '@/lib/features/products/productsSlice';
 import Link from 'next/link';
+// We no longer need to import Image from 'next/image'
 import ConfirmationModal from '@/components/ConfirmationModal';
 
 export default function ProductDetailPage() {
@@ -19,6 +20,8 @@ export default function ProductDetailPage() {
   const { selectedProduct, loading, error } = useSelector((state: RootState) => state.products);
 
   useEffect(() => {
+    // This effect was intentionally left empty in the last fix to prevent a bug.
+    // We will re-add the fetch logic but remove the problematic cleanup.
     if (!token) {
       router.push('/login');
       return;
@@ -26,8 +29,6 @@ export default function ProductDetailPage() {
     if (slug) {
       dispatch(fetchProductBySlug(slug));
     }
-    // --- THIS IS THE FIX ---
-    // The cleanup function that was causing the problem has been removed.
   }, [slug, dispatch, token, router]);
 
   const handleConfirmDelete = () => {
@@ -40,7 +41,7 @@ export default function ProductDetailPage() {
     }
   };
 
-  if (loading === 'pending' && !selectedProduct) { // Adjusted loading condition
+  if (loading === 'pending' || !selectedProduct) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-off-white text-dark-space">
         Loading product details...
@@ -55,11 +56,9 @@ export default function ProductDetailPage() {
       </div>
     );
   }
-  
-  // Render nothing if the product hasn't loaded yet to prevent errors
-  if (!selectedProduct) {
-    return null;
-  }
+
+  // This safety check prevents the app from crashing with bad data
+  const imageUrl = (selectedProduct.images && selectedProduct.images[0]) ? selectedProduct.images[0] : 'https://placehold.co/600x400/F0F0F0/CCC?text=No+Image';
 
   return (
     <>
@@ -76,8 +75,9 @@ export default function ProductDetailPage() {
           
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-16">
             <div className="rounded-xl bg-white p-6 shadow-sm">
+              {/* --- THE FIX: Reverted to a standard <img> tag --- */}
               <img 
-                src={selectedProduct.images?.[0] || 'https://placehold.co/600x400/F0F0F0/CCC?text=No+Image'} 
+                src={imageUrl} 
                 alt={selectedProduct.name}
                 className="h-full w-full object-contain"
               />
@@ -120,3 +120,4 @@ export default function ProductDetailPage() {
     </>
   );
 }
+

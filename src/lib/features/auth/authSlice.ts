@@ -24,19 +24,28 @@ export const loginUser = createAsyncThunk(
         body: JSON.stringify({ email }),
       });
 
+      // --- THIS IS THE FIX ---
+      // If the response is not OK, we need to handle both JSON and text errors
       if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Login failed');
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.indexOf('application/json') !== -1) {
+          // It's a JSON error, parse it
+          const errorData = await response.json();
+          return rejectWithValue(errorData.message || 'Login failed');
+        } else {
+          // It's a plain text error (like "Too many requests"), read it as text
+          const errorText = await response.text();
+          return rejectWithValue(errorText);
+        }
       }
 
       const data = await response.json();
       return data.token;
-    } catch (error) { // Removed ': any'
-      // Best practice: check if it's an error object
+    } catch (error) {
       if (error instanceof Error) {
         return rejectWithValue(error.message);
       }
-      return rejectWithValue('An unknown error occurred');
+      return rejectWithValue('An unknown network error occurred');
     }
   }
 );
@@ -68,3 +77,4 @@ const authSlice = createSlice({
 
 export const { logout } = authSlice.actions;
 export default authSlice.reducer;
+
