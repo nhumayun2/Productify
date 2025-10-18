@@ -15,11 +15,8 @@ export default function EditProductPage() {
   const params = useParams();
   const slug = params.slug as string;
 
-  // --- THIS IS THE FIX ---
-  // We now select the product-specific loading state.
   const { selectedProduct, loading: productLoading } = useSelector((state: RootState) => state.products);
 
-  // Fetch the product's data when the page loads
   useEffect(() => {
     if (slug) {
       dispatch(fetchProductBySlug(slug));
@@ -30,7 +27,6 @@ export default function EditProductPage() {
     if (selectedProduct) {
       dispatch(updateProduct({ id: selectedProduct.id, data })).then((action) => {
         if (updateProduct.fulfilled.match(action)) {
-          // On success, redirect back to the product's details page
           router.push(`/products/${action.payload.slug}`);
         } else {
           console.error('Failed to update product:', action.payload);
@@ -39,8 +35,6 @@ export default function EditProductPage() {
     }
   };
   
-  // --- THIS IS THE FIX ---
-  // The loading condition is now more specific and also checks if we have a selected product.
   if (productLoading === 'pending' && !selectedProduct) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-off-white text-dark-space">
@@ -49,7 +43,6 @@ export default function EditProductPage() {
     );
   }
   
-  // Handle case where product fails to load or slug is invalid
   if (!selectedProduct) {
     return (
        <div className="flex min-h-screen items-center justify-center bg-off-white text-dark-space">
@@ -58,7 +51,6 @@ export default function EditProductPage() {
     )
   }
 
-  // Prepare initial data for the form
   const initialData = {
     name: selectedProduct.name,
     description: selectedProduct.description,
@@ -83,7 +75,7 @@ export default function EditProductPage() {
                 Edit Product
             </h1>
             <p className="mx-auto max-w-lg text-lg text-gray-600">
-                Update the details for "{selectedProduct.name}".
+                Update the details for &ldquo;{selectedProduct.name}&rdquo;.
             </p>
         </div>
 

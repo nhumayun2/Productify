@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, useRouter } from 'next/navigation';
 import { AppDispatch, RootState } from '@/lib/store';
-import { fetchProductBySlug, clearSelectedProduct, deleteProduct } from '@/lib/features/products/productsSlice';
+// Removed 'clearSelectedProduct' from this import as it was unused
+import { fetchProductBySlug, deleteProduct } from '@/lib/features/products/productsSlice';
 import Link from 'next/link';
-// We no longer need to import Image from 'next/image'
 import ConfirmationModal from '@/components/ConfirmationModal';
 
 export default function ProductDetailPage() {
@@ -20,8 +20,6 @@ export default function ProductDetailPage() {
   const { selectedProduct, loading, error } = useSelector((state: RootState) => state.products);
 
   useEffect(() => {
-    // This effect was intentionally left empty in the last fix to prevent a bug.
-    // We will re-add the fetch logic but remove the problematic cleanup.
     if (!token) {
       router.push('/login');
       return;
@@ -29,6 +27,8 @@ export default function ProductDetailPage() {
     if (slug) {
       dispatch(fetchProductBySlug(slug));
     }
+    // We intentionally do not clear the selected product on unmount anymore
+    // to prevent the race condition bug when navigating to the edit page.
   }, [slug, dispatch, token, router]);
 
   const handleConfirmDelete = () => {
@@ -41,7 +41,7 @@ export default function ProductDetailPage() {
     }
   };
 
-  if (loading === 'pending' || !selectedProduct) {
+  if (loading === 'pending' && !selectedProduct) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-off-white text-dark-space">
         Loading product details...
@@ -57,8 +57,20 @@ export default function ProductDetailPage() {
     );
   }
 
-  // This safety check prevents the app from crashing with bad data
-  const imageUrl = (selectedProduct.images && selectedProduct.images[0]) ? selectedProduct.images[0] : 'https://placehold.co/600x400/F0F0F0/CCC?text=No+Image';
+  // Handle case where the slug is invalid or product not found
+  if (!selectedProduct) {
+      return (
+          <div className="flex min-h-screen flex-col items-center justify-center bg-off-white text-dark-space">
+              <h2 className="text-2xl font-bold">Product Not Found</h2>
+              <p className="mt-2 text-gray-500">The product you are looking for does not exist.</p>
+              <Link href="/" className="mt-6 rounded-full bg-forest-green px-6 py-2 font-semibold text-white">
+                  Back to All Products
+              </Link>
+          </div>
+      )
+  }
+
+  const isValidImage = selectedProduct.images && selectedProduct.images.length > 0 && selectedProduct.images[0];
 
   return (
     <>
@@ -75,9 +87,8 @@ export default function ProductDetailPage() {
           
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-16">
             <div className="rounded-xl bg-white p-6 shadow-sm">
-              {/* --- THE FIX: Reverted to a standard <img> tag --- */}
               <img 
-                src={imageUrl} 
+                src={isValidImage ? selectedProduct.images[0] : 'https://placehold.co/600x400/F0F0F0/CCC?text=No+Image'} 
                 alt={selectedProduct.name}
                 className="h-full w-full object-contain"
               />
