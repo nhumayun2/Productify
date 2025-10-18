@@ -4,34 +4,44 @@ import { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-// We no longer need to import Image from 'next/image'
 import { AppDispatch, RootState } from '@/lib/store';
-import { fetchProducts, searchProducts } from '@/lib/features/products/productsSlice';
+import { fetchProducts, searchProducts, fetchProductsByCategory } from '@/lib/features/products/productsSlice';
+import { fetchCategories } from '@/lib/features/categories/categoriesSlice';
 import Pagination from '@/components/Pagination';
 
 export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null); // State for the active filter
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const isInitialMount = useRef(true);
 
+  // --- Select all necessary data from Redux store ---
   const { items: products, loading, error, currentPage, hasNextPage } = useSelector((state: RootState) => state.products);
+  const { items: categories, loading: categoriesLoading } = useSelector((state: RootState) => state.categories);
   const { token } = useSelector((state: RootState) => state.auth);
 
+  // --- Effect for initial data fetching ---
   useEffect(() => {
     if (!token) {
       router.push('/login');
     } else {
+      // Fetch initial products and categories
       dispatch(fetchProducts({ page: 1 }));
+      if (categories.length === 0) {
+        dispatch(fetchCategories());
+      }
     }
-  }, [token, dispatch, router]);
+  }, [token, dispatch, router, categories.length]);
 
+  // --- Effect for handling search ---
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
     }
     const handler = setTimeout(() => {
+      setSelectedCategory(null); // Clear category filter when searching
       if (searchTerm) {
         dispatch(searchProducts(searchTerm));
       } else {
@@ -41,9 +51,28 @@ export default function HomePage() {
     return () => clearTimeout(handler);
   }, [searchTerm, dispatch]);
 
+  // --- Handler for changing pages ---
   const handlePageChange = (newPage: number) => {
-    dispatch(fetchProducts({ page: newPage }));
+    // Check if a category is selected and call the appropriate action
+    if (selectedCategory) {
+      dispatch(fetchProductsByCategory({ categoryId: selectedCategory, page: newPage }));
+    } else {
+      dispatch(fetchProducts({ page: newPage }));
+    }
   };
+
+  // --- Handler for selecting a category ---
+  const handleCategorySelect = (categoryId: string | null) => {
+    setSearchTerm(''); // Clear search when selecting a category
+    setSelectedCategory(categoryId);
+    if (categoryId) {
+      dispatch(fetchProductsByCategory({ categoryId: categoryId, page: 1 }));
+    } else {
+      // If "All" is selected, fetch all products
+      dispatch(fetchProducts({ page: 1 }));
+    }
+  };
+
 
   if (!token) return null;
 
@@ -53,19 +82,15 @@ export default function HomePage() {
     <main className="min-h-screen bg-off-white p-4 sm:p-8">
       <div className="container mx-auto">
         <div className="mb-12 text-center">
-          <h1 className="mb-4 text-5xl font-bold text-dark-space">
-            Explore Our Products
-          </h1>
-          <p className="mx-auto max-w-lg text-lg text-gray-600">
-            Find, create, and manage your inventory with ease.
-          </p>
+          <h1 className="mb-4 text-5xl font-bold text-dark-space">Explore Our Products</h1>
+          <p className="mx-auto max-w-lg text-lg text-gray-600">Find, create, and manage your inventory with ease.</p>
         </div>
         
         <div className="mb-8 flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="relative w-full md:w-1/3">
-                 <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-5">
+                 <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
                     <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
                     </svg>
                  </span>
                  <input
@@ -73,7 +98,7 @@ export default function HomePage() {
                     placeholder="Search products by name..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full rounded-full border-2 border-gray-200 bg-white py-3 pl-12 pr-6 text-dark-space placeholder-gray-400 focus:border-tan focus:outline-none focus:ring-0"
+                    className="w-full rounded-full border-2 border-gray-200 bg-white py-3 pl-12 pr-4 text-dark-space placeholder-gray-400 focus:border-tan focus:outline-none focus:ring-0"
                 />
             </div>
             <Link
@@ -84,39 +109,48 @@ export default function HomePage() {
             </Link>
         </div>
 
+        {/* --- NEW: Category Filter Buttons --- */}
+        <div className="mb-8 flex flex-wrap items-center justify-center gap-2">
+            <button 
+                onClick={() => handleCategorySelect(null)}
+                className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${selectedCategory === null ? 'bg-forest-green text-white shadow-md' : 'bg-white text-dark-space hover:bg-gray-100'}`}
+            >
+                All
+            </button>
+            {categories.map((category) => (
+                <button 
+                    key={category.id}
+                    onClick={() => handleCategorySelect(category.id)}
+                    className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${selectedCategory === category.id ? 'bg-forest-green text-white shadow-md' : 'bg-white text-dark-space hover:bg-gray-100'}`}
+                >
+                    {category.name}
+                </button>
+            ))}
+        </div>
+
+        {/* UI States */}
         {loading === 'pending' && <div className="flex justify-center p-12 text-dark-space">Loading...</div>}
         {error && <div className="flex justify-center p-12 text-burnt-sienna">Error: {error}</div>}
         {loading !== 'pending' && products.length === 0 && <div className="flex justify-center p-12 text-gray-500">No products found.</div>}
         
+        {/* Products Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {products.map((product) => {
-            const imageUrl = (product.images && product.images[0]) ? product.images[0] : 'https://placehold.co/600x400/F0F0F0/CCC?text=No+Image';
-
-            return (
-              <Link href={`/products/${product.slug}`} key={product.id} className="group">
-                <div className="overflow-hidden rounded-xl bg-white shadow-sm transition-shadow duration-300 group-hover:shadow-lg">
-                  <div className="relative h-64 w-full bg-gray-100">
-                    {/* --- THE FIX: Reverted to a standard <img> tag --- */}
-                    <img 
-                      src={imageUrl} 
-                      alt={product.name} 
-                      className="h-full w-full object-contain p-4"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
-                        <svg className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                    </div>
-                  </div>
-                  <div className="p-5">
-                    <h2 className="truncate text-lg font-bold text-dark-space">{product.name}</h2>
-                    <p className="mt-2 text-xl font-semibold text-forest-green">${product.price}</p>
+          {products.map((product) => (
+            <Link href={`/products/${product.slug}`} key={product.id} className="group">
+              <div className="overflow-hidden rounded-xl bg-white shadow-sm transition-shadow duration-300 group-hover:shadow-lg">
+                <div className="relative h-64 w-full bg-gray-100 p-4">
+                  <img src={isValidUrl(product.images?.[0]) ? product.images[0] : 'https://placehold.co/600x400/F0F0F0/CCC?text=No+Image'} alt={product.name} className="h-full w-full object-contain" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
+                      <svg className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                   </div>
                 </div>
-              </Link>
-            );
-          })}
+                <div className="p-5">
+                  <h2 className="truncate text-lg font-bold text-dark-space">{product.name}</h2>
+                  <p className="mt-2 text-xl font-semibold text-forest-green">${product.price}</p>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
 
         {showPagination && (
@@ -129,5 +163,16 @@ export default function HomePage() {
       </div>
     </main>
   );
+}
+
+// Helper function to validate URL
+function isValidUrl(urlString: string | undefined | null): boolean {
+  if (!urlString) return false;
+  try {
+    new URL(urlString);
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 

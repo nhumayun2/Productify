@@ -32,17 +32,22 @@ export default function ProductForm({
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  // --- THIS IS THE FIX ---
-  // This effect now checks if categories already exist before fetching.
+  // Fetch categories only if they aren't already in the store
   useEffect(() => {
     if (categories.length === 0) {
       dispatch(fetchCategories());
     }
   }, [dispatch, categories.length]);
 
+  // --- THIS IS THE FIX ---
+  // Safely populate form if initialData is provided
   useEffect(() => {
     if (isEditing && initialData) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        // Ensure that formData.images is ALWAYS an array
+        images: initialData.images || [''],
+      });
     }
   }, [initialData, isEditing]);
 
@@ -64,16 +69,13 @@ export default function ProductForm({
     if (!formData.price) newErrors.price = 'Price is required';
     if (Number(formData.price) <= 0) newErrors.price = 'Price must be greater than 0';
     if (!formData.categoryId) newErrors.categoryId = 'Category is required';
-    
     if (!formData.images[0]) {
       newErrors.image = 'Image URL is required';
     } else {
       try {
         new URL(formData.images[0]);
-      } catch (e) { // Use 'e' to fix the unused variable linting error
-        if (e instanceof TypeError) {
-          newErrors.image = 'Please enter a valid URL';
-        }
+      } catch (error) { // Use the error variable
+        newErrors.image = 'Please enter a valid URL';
       }
     }
 
@@ -87,87 +89,82 @@ export default function ProductForm({
       onSubmit({
         ...formData,
         price: Number(formData.price),
-        // Ensure images is always an array, even if the input is cleared
-        images: formData.images[0] ? formData.images : [],
+        // Ensure images array is not empty on submit
+        images: formData.images?.[0] ? [formData.images[0]] : [],
       });
     }
   };
 
   return (
-    <div className="rounded-xl bg-white p-8 shadow-sm">
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Product Name */}
+      <div>
+        <label htmlFor="name" className="block text-sm font-medium text-dark-space">Product Name</label>
+        <input
+          type="text" id="name" name="name" value={formData.name} onChange={handleChange}
+          className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-dark-space shadow-sm focus:border-tan focus:ring-tan"
+        />
+        {errors.name && <p className="mt-1 text-sm text-burnt-sienna">{errors.name}</p>}
+      </div>
+      
+      {/* Image URL */}
+      <div>
+        <label htmlFor="image" className="block text-sm font-medium text-dark-space">Image URL</label>
+        <input
+          type="text" id="image" name="image" placeholder="https://..." 
+          // --- THIS IS ALSO PART OF THE FIX ---
+          // Use optional chaining for extra safety
+          value={formData.images?.[0] || ''} 
+          onChange={handleImageChange}
+          className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-dark-space shadow-sm focus:border-tan focus:ring-tan"
+        />
+        {errors.image && <p className="mt-1 text-sm text-burnt-sienna">{errors.image}</p>}
+      </div>
+
+      {/* Description */}
+      <div>
+        <label htmlFor="description" className="block text-sm font-medium text-dark-space">Description</label>
+        <textarea
+          id="description" name="description" rows={4} value={formData.description} onChange={handleChange}
+          className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-dark-space shadow-sm focus:border-tan focus:ring-tan"
+        />
+        {errors.description && <p className="mt-1 text-sm text-burnt-sienna">{errors.description}</p>}
+      </div>
+
+      {/* Price & Category in a grid */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Product Name
-            </label>
-            <input
-            type="text" id="name" name="name" value={formData.name} onChange={handleChange}
+          <label htmlFor="price" className="block text-sm font-medium text-dark-space">Price</label>
+          <input
+            type="number" id="price" name="price" value={formData.price} onChange={handleChange}
             className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-dark-space shadow-sm focus:border-tan focus:ring-tan"
-            />
-            {errors.name && <p className="mt-1 text-sm text-burnt-sienna">{errors.name}</p>}
+          />
+          {errors.price && <p className="mt-1 text-sm text-burnt-sienna">{errors.price}</p>}
         </div>
-        
         <div>
-            <label htmlFor="image" className="block text-sm font-medium text-gray-700">
-            Image URL
-            </label>
-            <input
-            type="text" id="image" name="image" placeholder="https://..." value={formData.images[0] || ''} onChange={handleImageChange}
+          <label htmlFor="categoryId" className="block text-sm font-medium text-dark-space">Category</label>
+          <select
+            id="categoryId" name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={categoriesLoading === 'pending'}
             className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-dark-space shadow-sm focus:border-tan focus:ring-tan"
-            />
-            {errors.image && <p className="mt-1 text-sm text-burnt-sienna">{errors.image}</p>}
+          >
+            <option value="">{categoriesLoading === 'pending' ? 'Loading...' : 'Select a category'}</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          {errors.categoryId && <p className="mt-1 text-sm text-burnt-sienna">{errors.categoryId}</p>}
         </div>
+      </div>
 
-        <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-            Description
-            </label>
-            <textarea
-            id="description" name="description" rows={4} value={formData.description} onChange={handleChange}
-            className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-dark-space shadow-sm focus:border-tan focus:ring-tan"
-            />
-            {errors.description && <p className="mt-1 text-sm text-burnt-sienna">{errors.description}</p>}
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div>
-                <label htmlFor="price" className="block text-sm font-medium text-gray-700">
-                Price
-                </label>
-                <input
-                type="number" id="price" name="price" value={formData.price} onChange={handleChange}
-                className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-dark-space shadow-sm focus:border-tan focus:ring-tan"
-                />
-                {errors.price && <p className="mt-1 text-sm text-burnt-sienna">{errors.price}</p>}
-            </div>
-
-            <div>
-                <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700">
-                Category
-                </label>
-                <select
-                id="categoryId" name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={categoriesLoading === 'pending'}
-                className="mt-1 block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-dark-space shadow-sm focus:border-tan focus:ring-tan"
-                >
-                <option value="">{categoriesLoading === 'pending' ? 'Loading...' : 'Select a category'}</option>
-                {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                    {category.name}
-                    </option>
-                ))}
-                </select>
-                {errors.categoryId && <p className="mt-1 text-sm text-burnt-sienna">{errors.categoryId}</p>}
-            </div>
-        </div>
-
-        <button
-            type="submit"
-            className="w-full rounded-full bg-forest-green px-4 py-3 font-semibold text-off-white shadow-lg shadow-forest-green/30 transition-transform hover:scale-105 active:scale-95"
-        >
-            {isEditing ? 'Update Product' : 'Create Product'}
-        </button>
-        </form>
-    </div>
+      <button
+        type="submit"
+        className="w-full rounded-full bg-forest-green px-4 py-3 font-semibold text-white shadow-lg shadow-forest-green/40 transition-transform hover:scale-105 active:scale-95"
+      >
+        {isEditing ? 'Update Product' : 'Create Product'}
+      </button>
+    </form>
   );
 }
 

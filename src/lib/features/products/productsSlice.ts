@@ -14,6 +14,14 @@ interface FetchProductsPayload {
   limit?: number;
 }
 
+// --- NEW: Define the payload for fetching by category ---
+interface FetchProductsByCategoryPayload {
+  categoryId: string;
+  page: number;
+  limit?: number;
+}
+
+
 // Define the shape of the products state with pagination fields
 interface ProductsState {
   items: Product[];
@@ -66,6 +74,27 @@ export const fetchProducts = createAsyncThunk(
     }
   }
 );
+
+// --- NEW: Thunk for fetching products by category ---
+export const fetchProductsByCategory = createAsyncThunk(
+  'products/fetchProductsByCategory',
+  async ({ categoryId, page, limit = 12 }: FetchProductsByCategoryPayload, { getState, rejectWithValue }) => {
+    const token = (getState() as RootState).auth.token;
+    if (!token) return rejectWithValue('No authentication token found');
+    const offset = (page - 1) * limit;
+    try {
+      const response = await fetch(`https://api.bitechx.com/products?offset=${offset}&limit=${limit}&categoryId=${categoryId}`, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
+      if (!response.ok) return rejectWithValue(await handleApiError(response, 'Failed to fetch products by category'));
+      const data = await response.json();
+      const hasNext = data.length === limit;
+      return { products: data, hasNextPage: hasNext, page };
+    } catch (error) {
+      if (error instanceof Error) return rejectWithValue(error.message);
+      return rejectWithValue('An unknown error occurred');
+    }
+  }
+);
+
 
 export const fetchProductBySlug = createAsyncThunk(
   'products/fetchProductBySlug',
@@ -158,6 +187,13 @@ const productsSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchProducts.fulfilled, (state, action) => {
+        state.items = Array.isArray(action.payload.products) ? action.payload.products : [];
+        state.hasNextPage = action.payload.hasNextPage;
+        state.currentPage = action.payload.page;
+        state.loading = 'succeeded';
+      })
+      // --- NEW: Case for fetching products by category ---
+      .addCase(fetchProductsByCategory.fulfilled, (state, action) => {
         state.items = Array.isArray(action.payload.products) ? action.payload.products : [];
         state.hasNextPage = action.payload.hasNextPage;
         state.currentPage = action.payload.page;

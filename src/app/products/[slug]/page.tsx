@@ -4,10 +4,21 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, useRouter } from 'next/navigation';
 import { AppDispatch, RootState } from '@/lib/store';
-// Removed 'clearSelectedProduct' from this import as it was unused
 import { fetchProductBySlug, deleteProduct } from '@/lib/features/products/productsSlice';
 import Link from 'next/link';
+import Image from 'next/image';
 import ConfirmationModal from '@/components/ConfirmationModal';
+
+// Helper function to validate URL
+function isValidUrl(urlString: string | undefined | null): boolean {
+  if (!urlString) return false;
+  try {
+    new URL(urlString);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 export default function ProductDetailPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,12 +35,20 @@ export default function ProductDetailPage() {
       router.push('/login');
       return;
     }
+
     if (slug) {
-      dispatch(fetchProductBySlug(slug));
+      // --- THIS IS THE FIX ---
+      // We now check the result of the dispatch action
+      dispatch(fetchProductBySlug(slug)).then(action => {
+        // If the fetch action was rejected, it means the slug is likely invalid
+        if (fetchProductBySlug.rejected.match(action)) {
+          // Redirect to the homepage for a better user experience
+          router.push('/');
+        }
+      });
     }
-    // We intentionally do not clear the selected product on unmount anymore
-    // to prevent the race condition bug when navigating to the edit page.
   }, [slug, dispatch, token, router]);
+
 
   const handleConfirmDelete = () => {
     if (selectedProduct) {
@@ -41,6 +60,7 @@ export default function ProductDetailPage() {
     }
   };
 
+  // Show loading state ONLY if there's no product data yet
   if (loading === 'pending' && !selectedProduct) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-off-white text-dark-space">
@@ -49,7 +69,8 @@ export default function ProductDetailPage() {
     );
   }
 
-  if (error) {
+  // If there's an error AND no product, something went wrong initially
+  if (error && !selectedProduct) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-off-white text-burnt-sienna">
         Error: {error}
@@ -57,20 +78,15 @@ export default function ProductDetailPage() {
     );
   }
 
-  // Handle case where the slug is invalid or product not found
+  // If there's no product after loading, it's likely being redirected
   if (!selectedProduct) {
-      return (
-          <div className="flex min-h-screen flex-col items-center justify-center bg-off-white text-dark-space">
-              <h2 className="text-2xl font-bold">Product Not Found</h2>
-              <p className="mt-2 text-gray-500">The product you are looking for does not exist.</p>
-              <Link href="/" className="mt-6 rounded-full bg-forest-green px-6 py-2 font-semibold text-white">
-                  Back to All Products
-              </Link>
-          </div>
-      )
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-off-white text-dark-space">
+            Loading product details...
+        </div>
+    );
   }
 
-  const isValidImage = selectedProduct.images && selectedProduct.images.length > 0 && selectedProduct.images[0];
 
   return (
     <>
@@ -86,14 +102,16 @@ export default function ProductDetailPage() {
           </div>
           
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-16">
-            <div className="rounded-xl bg-white p-6 shadow-sm">
-              <img 
-                src={isValidImage ? selectedProduct.images[0] : 'https://placehold.co/600x400/F0F0F0/CCC?text=No+Image'} 
+            {/* Left Column: Image */}
+            <div className="h-[500px] rounded-xl bg-white p-6 shadow-sm">
+               <img 
+                src={isValidUrl(selectedProduct.images?.[0]) ? selectedProduct.images[0] : 'https://placehold.co/600x400/F0F0F0/CCC?text=No+Image'}
                 alt={selectedProduct.name}
                 className="h-full w-full object-contain"
               />
             </div>
             
+            {/* Right Column: Details */}
             <div className="flex flex-col py-4">
               <span className="mb-2 text-sm font-semibold uppercase tracking-widest text-tan">
                 {selectedProduct.category.name}
