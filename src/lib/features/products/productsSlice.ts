@@ -6,10 +6,12 @@ interface UpdateProductPayload {
   id: string;
   data: Partial<ProductSubmitData>;
 }
+
 interface FetchProductsPayload {
   page: number;
   limit?: number;
 }
+
 interface ProductsState {
   items: Product[];
   selectedProduct: Product | null;
@@ -28,6 +30,8 @@ const initialState: ProductsState = {
   hasNextPage: true,
 };
 
+// --- Thunk Definitions ---
+
 export const fetchProducts = createAsyncThunk(
   'products/fetchProducts',
   async ({ page, limit = 12 }: FetchProductsPayload, { getState, rejectWithValue }) => {
@@ -40,8 +44,9 @@ export const fetchProducts = createAsyncThunk(
       const data = await response.json();
       const hasNext = data.length === limit;
       return { products: data, hasNextPage: hasNext, page };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'An unknown error occurred');
+    } catch (error) {
+      if (error instanceof Error) return rejectWithValue(error.message);
+      return rejectWithValue('An unknown error occurred while fetching products');
     }
   }
 );
@@ -55,8 +60,9 @@ export const fetchProductBySlug = createAsyncThunk(
       const response = await fetch(`https://api.bitechx.com/products/${slug}`, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
       if (!response.ok) return rejectWithValue((await response.json()).message || 'Failed to fetch product');
       return await response.json();
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'An unknown error occurred');
+    } catch (error) {
+      if (error instanceof Error) return rejectWithValue(error.message);
+      return rejectWithValue('An unknown error occurred fetching the product');
     }
   }
 );
@@ -70,8 +76,9 @@ export const deleteProduct = createAsyncThunk(
       const response = await fetch(`https://api.bitechx.com/products/${productId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       if (!response.ok) return rejectWithValue((await response.json()).message || 'Failed to delete product');
       return productId;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'An unknown error occurred');
+    } catch (error) {
+      if (error instanceof Error) return rejectWithValue(error.message);
+      return rejectWithValue('An unknown error occurred while deleting');
     }
   }
 );
@@ -85,8 +92,9 @@ export const searchProducts = createAsyncThunk(
       const response = await fetch(`https://api.bitechx.com/products/search?searchedText=${searchText}`, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
       if (!response.ok) return rejectWithValue((await response.json()).message || 'Search failed');
       return await response.json();
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'An unknown error occurred');
+    } catch (error) {
+      if (error instanceof Error) return rejectWithValue(error.message);
+      return rejectWithValue('An unknown error occurred during search');
     }
   }
 );
@@ -100,8 +108,9 @@ export const createProduct = createAsyncThunk(
       const response = await fetch('https://api.bitechx.com/products', { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(productData) });
       if (!response.ok) return rejectWithValue((await response.json()).message || 'Failed to create product');
       return await response.json();
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'An unknown error occurred');
+    } catch (error) {
+      if (error instanceof Error) return rejectWithValue(error.message);
+      return rejectWithValue('An unknown error occurred during creation');
     }
   }
 );
@@ -115,11 +124,14 @@ export const updateProduct = createAsyncThunk(
       const response = await fetch(`https://api.bitechx.com/products/${id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (!response.ok) return rejectWithValue((await response.json()).message || 'Failed to update product');
       return await response.json();
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'An unknown error occurred');
+    } catch (error) {
+      if (error instanceof Error) return rejectWithValue(error.message);
+      return rejectWithValue('An unknown error occurred during update');
     }
   }
 );
+
+// --- Slice Definition ---
 
 const productsSlice = createSlice({
   name: 'products',
@@ -163,14 +175,14 @@ const productsSlice = createSlice({
         state.loading = 'succeeded';
       })
       .addMatcher(
-        (action) => action.type.startsWith('products/') && action.type.endsWith('/pending'),
+        (action) => action.type.endsWith('/pending'),
         (state) => {
           state.loading = 'pending';
           state.error = null;
         }
       )
       .addMatcher(
-        (action) => action.type.startsWith('products/') && action.type.endsWith('/rejected'),
+        (action) => action.type.endsWith('/rejected'),
         (state, action: PayloadAction<string>) => {
           state.loading = 'failed';
           state.error = action.payload;
@@ -181,3 +193,4 @@ const productsSlice = createSlice({
 
 export const { clearSelectedProduct } = productsSlice.actions;
 export default productsSlice.reducer;
+

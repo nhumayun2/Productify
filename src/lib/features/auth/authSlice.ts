@@ -11,6 +11,7 @@ const initialState: AuthState = {
   loading: 'idle',
   error: null,
 };
+
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (email: string, { rejectWithValue }) => {
@@ -30,8 +31,12 @@ export const loginUser = createAsyncThunk(
 
       const data = await response.json();
       return data.token;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'An unknown error occurred');
+    } catch (error) { // Removed ': any'
+      // Best practice: check if it's an error object
+      if (error instanceof Error) {
+        return rejectWithValue(error.message);
+      }
+      return rejectWithValue('An unknown error occurred');
     }
   }
 );
@@ -44,7 +49,6 @@ const authSlice = createSlice({
       state.token = null;
     },
   },
-
   extraReducers: (builder) => {
     builder
       .addCase(loginUser.pending, (state) => {
@@ -61,5 +65,6 @@ const authSlice = createSlice({
       });
   },
 });
+
 export const { logout } = authSlice.actions;
 export default authSlice.reducer;

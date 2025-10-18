@@ -1,28 +1,19 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from '@/lib/store';
+import { Category } from '@/types';
 
-// Define the shape of a single category
-interface Category {
-  id: string;
-  name: string;
-  image: string;
-}
-
-// Define the shape of the categories state
 interface CategoriesState {
   items: Category[];
   loading: 'idle' | 'pending' | 'succeeded' | 'failed';
   error: string | null;
 }
 
-// Set the initial state
 const initialState: CategoriesState = {
   items: [],
   loading: 'idle',
   error: null,
 };
 
-// Create an async thunk for fetching categories
 export const fetchCategories = createAsyncThunk(
   'categories/fetchCategories',
   async (_, { getState, rejectWithValue }) => {
@@ -44,13 +35,15 @@ export const fetchCategories = createAsyncThunk(
         return rejectWithValue(errorData.message || 'Failed to fetch categories');
       }
       return await response.json();
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'An unknown error occurred');
+    } catch (error) { // Removed ': any'
+      if (error instanceof Error) {
+        return rejectWithValue(error.message);
+      }
+      return rejectWithValue('An unknown error occurred while fetching categories');
     }
   }
 );
 
-// Create the categories slice
 const categoriesSlice = createSlice({
   name: 'categories',
   initialState,
