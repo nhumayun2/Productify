@@ -1,4 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 @import "tailwindcss";
+
+@theme {
+  --color-dark-space: #0D1821;
+  --color-off-white: #EFF1F3;
+  --color-forest-green: #4E6E5D;
+  --color-tan: #AD8A64;
+  --color-burnt-sienna: #A44A3F;
+}
 
 :root {
   --background: #ffffff;
