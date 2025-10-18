@@ -2,16 +2,19 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from '@/lib/store';
 import { Product, ProductSubmitData } from '@/types';
 
+// Define the payload for the updateProduct thunk
 interface UpdateProductPayload {
   id: string;
   data: Partial<ProductSubmitData>;
 }
 
+// Define the payload for the fetchProducts thunk for pagination
 interface FetchProductsPayload {
   page: number;
   limit?: number;
 }
 
+// Define the shape of the products state with pagination fields
 interface ProductsState {
   items: Product[];
   selectedProduct: Product | null;
@@ -30,7 +33,20 @@ const initialState: ProductsState = {
   hasNextPage: true,
 };
 
-// --- Thunk Definitions ---
+// A helper function to handle API errors gracefully
+const handleApiError = async (response: Response, defaultMessage: string) => {
+  const contentType = response.headers.get("content-type");
+  if (contentType && contentType.indexOf("application/json") !== -1) {
+    const errorData = await response.json();
+    return errorData.message || defaultMessage;
+  } else {
+    // If not JSON, return the plain text response
+    return await response.text();
+  }
+};
+
+
+// --- Thunk Definitions with updated error handling ---
 
 export const fetchProducts = createAsyncThunk(
   'products/fetchProducts',
@@ -40,13 +56,13 @@ export const fetchProducts = createAsyncThunk(
     const offset = (page - 1) * limit;
     try {
       const response = await fetch(`https://api.bitechx.com/products?offset=${offset}&limit=${limit}`, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
-      if (!response.ok) return rejectWithValue((await response.json()).message || 'Failed to fetch products');
+      if (!response.ok) return rejectWithValue(await handleApiError(response, 'Failed to fetch products'));
       const data = await response.json();
       const hasNext = data.length === limit;
       return { products: data, hasNextPage: hasNext, page };
     } catch (error) {
       if (error instanceof Error) return rejectWithValue(error.message);
-      return rejectWithValue('An unknown error occurred while fetching products');
+      return rejectWithValue('An unknown error occurred');
     }
   }
 );
@@ -58,11 +74,11 @@ export const fetchProductBySlug = createAsyncThunk(
     if (!token) return rejectWithValue('No authentication token found');
     try {
       const response = await fetch(`https://api.bitechx.com/products/${slug}`, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
-      if (!response.ok) return rejectWithValue((await response.json()).message || 'Failed to fetch product');
+      if (!response.ok) return rejectWithValue(await handleApiError(response, 'Failed to fetch product'));
       return await response.json();
     } catch (error) {
-      if (error instanceof Error) return rejectWithValue(error.message);
-      return rejectWithValue('An unknown error occurred fetching the product');
+        if (error instanceof Error) return rejectWithValue(error.message);
+        return rejectWithValue('An unknown error occurred');
     }
   }
 );
@@ -74,11 +90,11 @@ export const deleteProduct = createAsyncThunk(
     if (!token) return rejectWithValue('No authentication token found');
     try {
       const response = await fetch(`https://api.bitechx.com/products/${productId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-      if (!response.ok) return rejectWithValue((await response.json()).message || 'Failed to delete product');
+      if (!response.ok) return rejectWithValue(await handleApiError(response, 'Failed to delete product'));
       return productId;
     } catch (error) {
-      if (error instanceof Error) return rejectWithValue(error.message);
-      return rejectWithValue('An unknown error occurred while deleting');
+        if (error instanceof Error) return rejectWithValue(error.message);
+        return rejectWithValue('An unknown error occurred');
     }
   }
 );
@@ -90,11 +106,11 @@ export const searchProducts = createAsyncThunk(
     if (!token) return rejectWithValue('No authentication token found');
     try {
       const response = await fetch(`https://api.bitechx.com/products/search?searchedText=${searchText}`, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
-      if (!response.ok) return rejectWithValue((await response.json()).message || 'Search failed');
+      if (!response.ok) return rejectWithValue(await handleApiError(response, 'Search failed'));
       return await response.json();
     } catch (error) {
-      if (error instanceof Error) return rejectWithValue(error.message);
-      return rejectWithValue('An unknown error occurred during search');
+        if (error instanceof Error) return rejectWithValue(error.message);
+        return rejectWithValue('An unknown error occurred');
     }
   }
 );
@@ -106,11 +122,11 @@ export const createProduct = createAsyncThunk(
     if (!token) return rejectWithValue('No authentication token found');
     try {
       const response = await fetch('https://api.bitechx.com/products', { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(productData) });
-      if (!response.ok) return rejectWithValue((await response.json()).message || 'Failed to create product');
+      if (!response.ok) return rejectWithValue(await handleApiError(response, 'Failed to create product'));
       return await response.json();
     } catch (error) {
-      if (error instanceof Error) return rejectWithValue(error.message);
-      return rejectWithValue('An unknown error occurred during creation');
+        if (error instanceof Error) return rejectWithValue(error.message);
+        return rejectWithValue('An unknown error occurred');
     }
   }
 );
@@ -122,16 +138,14 @@ export const updateProduct = createAsyncThunk(
     if (!token) return rejectWithValue('No authentication token found');
     try {
       const response = await fetch(`https://api.bitechx.com/products/${id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (!response.ok) return rejectWithValue((await response.json()).message || 'Failed to update product');
+      if (!response.ok) return rejectWithValue(await handleApiError(response, 'Failed to update product'));
       return await response.json();
     } catch (error) {
-      if (error instanceof Error) return rejectWithValue(error.message);
-      return rejectWithValue('An unknown error occurred during update');
+        if (error instanceof Error) return rejectWithValue(error.message);
+        return rejectWithValue('An unknown error occurred');
     }
   }
 );
-
-// --- Slice Definition ---
 
 const productsSlice = createSlice({
   name: 'products',
